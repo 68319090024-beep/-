@@ -1,40 +1,186 @@
 <!DOCTYPE html>
-<html>
+<html lang="th">
 <head>
     <meta charset="UTF-8">
-    <title>Earthquake Online Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EQ Monitor Pro v2</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+
     <style>
-        /* ใช้ CSS เดิมที่ผมเคยให้ไว้ได้เลยครับ */
-        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; }
-        .card { background: #1e293b; padding: 20px; margin: 10px; border-radius: 10px; display: inline-block; width: 200px; }
-        .alert { background: #ef4444; }
+        :root {
+            --bg: #0f172a;
+            --glass: rgba(30, 41, 59, 0.7);
+            --primary: #38bdf8;
+            --danger: #f43f5e;
+            --success: #10b981;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background: radial-gradient(circle at top, #1e293b, #0f172a); /* ไล่สีพื้นหลังแบบวงกลม */
+            color: white;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+        }
+
+        .container { width: 100%; max-width: 480px; }
+
+        /* การตกแต่งแบบ Glassmorphism */
+        .glass-card {
+            background: var(--glass);
+            backdrop-filter: blur(10px); /* ทำพื้นหลังเบลอ */
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 24px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);
+        }
+
+        .status-header { text-align: center; border-bottom: 2px solid var(--primary); padding-bottom: 15px; }
+
+        .status-msg {
+            font-size: 0.9rem;
+            padding: 8px 15px;
+            border-radius: 50px;
+            background: rgba(255,255,255,0.1);
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+
+        .sensor-card {
+            background: rgba(255,255,255,0.05);
+            padding: 20px; border-radius: 20px; text-align: center;
+            transition: 0.3s;
+        }
+
+        .sensor-card i { font-size: 2rem; margin-bottom: 10px; color: var(--primary); }
+        .value { font-size: 1.5rem; font-weight: 600; display: block; }
+
+        /* ส่วนควบคุมปุ่ม */
+        .btn-group { display: flex; flex-direction: column; gap: 10px; }
+        .btn {
+            border: none; border-radius: 15px; padding: 14px;
+            font-family: 'Kanit'; font-weight: 600; font-size: 1rem;
+            cursor: pointer; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 10px;
+        }
+
+        .btn-test { background: var(--primary); color: #000; }
+        .btn-mute { background: var(--warning); color: #000; }
+        .btn-reset { background: rgba(255,255,255,0.1); color: #fff; }
+
+        .btn:active { transform: scale(0.95); }
+
+        /* แอนิเมชั่นเมื่อเกิดภัยพิบัติ */
+        .alert-mode {
+            border: 2px solid var(--danger);
+            animation: shake 0.5s infinite; /* สั่นหน้าจอ */
+        }
+
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            20% { transform: translate(-1px, -2px) rotate(-1deg); }
+            100% { transform: translate(1px, 1px) rotate(0deg); }
+        }
     </style>
 </head>
 <body>
-    <h1>Earthquake Monitor (Firebase)</h1>
-    <div id="card-vib" class="card">สั่นสะเทือน: <span id="v-vib">--</span></div>
-    <div id="card-sound" class="card">เสียง: <span id="v-sound">--</span></div>
-    <div class="card">อุณหภูมิ: <span id="v-temp">--</span>°C</div>
+
+    <div class="container">
+        <h2 style="text-align: center; font-weight: 300;">
+            <i class="fa-solid fa-satellite-dish" style="color: var(--primary);"></i> EQ MONITOR <b style="color: var(--primary);">PRO</b>
+        </h2>
+        
+        <div id="main-box" class="glass-card status-header">
+            <span style="color: #94a3b8; font-size: 0.8rem; text-transform: uppercase;">System Status</span>
+            <h1 id="status-text" style="margin: 10px 0; color: var(--success); font-size: 2.2rem;">ปลอดภัย</h1>
+            <div id="status-detail" class="status-msg">ระบบกำลังเฝ้าระวัง...</div>
+        </div>
+
+        <div class="grid">
+            <div class="sensor-card">
+                <i class="fa-solid fa-waveform-path"></i>
+                <span style="display:block; font-size:0.8rem; color:#94a3b8;">การสั่นสะเทือน</span>
+                <span id="v-vib" class="value">ปกติ</span>
+            </div>
+            <div class="sensor-card">
+                <i class="fa-solid fa-temperature-high"></i>
+                <span style="display:block; font-size:0.8rem; color:#94a3b8;">อุณหภูมิบอร์ด</span>
+                <span class="value"><span id="v-temp">--</span>°C</span>
+            </div>
+        </div>
+
+        <div class="glass-card">
+            <h3 style="margin-top:0; font-weight:400;"><i class="fa-solid fa-gamepad"></i> Control Panel</h3>
+            <div class="btn-group">
+                <button onclick="sendCommand('BUZZER_TEST')" class="btn btn-test">
+                    <i class="fa-solid fa-play"></i> ทดสอบไซเรน
+                </button>
+                <button onclick="sendCommand('BUZZER_OFF')" class="btn btn-mute">
+                    <i class="fa-solid fa-volume-xmark"></i> ปิดการแจ้งเตือน
+                </button>
+                <button onclick="sendCommand('RESET')" class="btn btn-reset">
+                    <i class="fa-solid fa-rotate"></i> รีเซ็ตระบบ
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // เอาค่าจาก Firebase Console มาวางตรงนี้
-        const firebaseConfig = {
-            databaseURL: "https://ชื่อโปรเจกต์ของคุณ.firebaseio.com/"
-        };
+        const firebaseConfig = { databaseURL: "https://kunthida-6ab5a-default-rtdb.firebaseio.com/" };
         firebase.initializeApp(firebaseConfig);
-        const db = firebase.database().ref('earthquake');
+        const db = firebase.database();
 
-        // ดึงข้อมูล Realtime
-        db.on('value', (snapshot) => {
+        // รับข้อมูลจาก Firebase
+        db.ref('earthquake').on('value', (snapshot) => {
             const data = snapshot.val();
-            document.getElementById('v-temp').innerText = data.temp;
-            document.getElementById('v-vib').innerText = data.vib == 1 ? "อันตราย" : "ปกติ";
-            document.getElementById('v-sound').innerText = data.sound == 1 ? "ดังผิดปกติ" : "ปกติ";
+            document.getElementById('v-temp').innerText = data.temp || "0";
             
-            document.getElementById('card-vib').className = data.vib == 1 ? "card alert" : "card";
+            const mainBox = document.getElementById('main-box');
+            const statusText = document.getElementById('status-text');
+            const statusDetail = document.getElementById('status-detail');
+            const vibVal = document.getElementById('v-vib');
+
+            if(data.vib === 1) {
+                statusText.innerText = "อันตราย!";
+                statusText.style.color = "var(--danger)";
+                statusDetail.innerText = "ตรวจพบแรงสั่นสะเทือนผิดปกติ!";
+                statusDetail.style.background = "rgba(244, 63, 94, 0.2)";
+                vibVal.innerText = "สั่นไหว";
+                vibVal.style.color = "var(--danger)";
+                mainBox.classList.add('alert-mode');
+            } else {
+                statusText.innerText = "ปลอดภัย";
+                statusText.style.color = "var(--success)";
+                statusDetail.innerText = "สถานะโดยรวม: ปกติ";
+                statusDetail.style.background = "rgba(16, 185, 129, 0.2)";
+                vibVal.innerText = "ปกติ";
+                vibVal.style.color = "white";
+                mainBox.classList.remove('alert-mode');
+            }
         });
+
+        // ฟังก์ชันส่งคำสั่งควบคุม
+        function sendCommand(cmd) {
+            db.ref('earthquake/control').set({
+                command: cmd,
+                timestamp: Date.now()
+            });
+            
+            // แจ้งเตือนสั้นๆ ให้ผู้ใช้รู้ว่ากดแล้ว
+            let msg = "";
+            if(cmd === 'BUZZER_TEST') msg = "กำลังทดสอบเสียง...";
+            if(cmd === 'BUZZER_OFF') msg = "สั่งปิดเสียงแล้ว";
+            if(cmd === 'RESET') msg = "กำลังรีเซ็ตสถานะ...";
+            
+            console.log("Sent Command:", cmd);
+        }
     </script>
 </body>
 </html>
