@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Earthquake Online Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <style>
+        /* ใช้ CSS เดิมที่ผมเคยให้ไว้ได้เลยครับ */
+        body { font-family: sans-serif; background: #0f172a; color: white; text-align: center; }
+        .card { background: #1e293b; padding: 20px; margin: 10px; border-radius: 10px; display: inline-block; width: 200px; }
+        .alert { background: #ef4444; }
+    </style>
+</head>
+<body>
+    <h1>Earthquake Monitor (Firebase)</h1>
+    <div id="card-vib" class="card">สั่นสะเทือน: <span id="v-vib">--</span></div>
+    <div id="card-sound" class="card">เสียง: <span id="v-sound">--</span></div>
+    <div class="card">อุณหภูมิ: <span id="v-temp">--</span>°C</div>
+
+    <script>
+        // เอาค่าจาก Firebase Console มาวางตรงนี้
+        const firebaseConfig = {
+            databaseURL: "https://ชื่อโปรเจกต์ของคุณ.firebaseio.com/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database().ref('earthquake');
+
+        // ดึงข้อมูล Realtime
+        db.on('value', (snapshot) => {
+            const data = snapshot.val();
+            document.getElementById('v-temp').innerText = data.temp;
+            document.getElementById('v-vib').innerText = data.vib == 1 ? "อันตราย" : "ปกติ";
+            document.getElementById('v-sound').innerText = data.sound == 1 ? "ดังผิดปกติ" : "ปกติ";
+            
+            document.getElementById('card-vib').className = data.vib == 1 ? "card alert" : "card";
+        });
+    </script>
+</body>
+</html>
